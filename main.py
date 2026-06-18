@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Ozon Reviews Auto Responder
-Автоматизирует процесс ответов на отзывы на Ozon с помощью Claude API
+Вставляет отзывы в Claude и ждет вашего ответа
 """
 
 import tkinter as tk
@@ -15,7 +15,7 @@ from config import Config
 class OzonReviewsApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Ozon Reviews Auto Responder")
+        self.root.title("Ozon Reviews Auto Responder (Claude вручную)")
         self.root.geometry("1200x700")
         self.root.resizable(True, True)
 
@@ -53,7 +53,7 @@ class OzonReviewsApp:
         self.open_claude_btn.pack(fill=tk.X, pady=5)
 
         # Кнопка начать обработку
-        self.start_btn = ttk.Button(left_frame, text="4. Начать автоматизацию", command=self.start_automation)
+        self.start_btn = ttk.Button(left_frame, text="4. Начать обработку", command=self.start_automation)
         self.start_btn.pack(fill=tk.X, pady=5)
         self.start_btn.config(state=tk.DISABLED)
 
@@ -64,24 +64,34 @@ class OzonReviewsApp:
 
         ttk.Separator(left_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=20)
 
-        # Настройки
-        settings_label = ttk.Label(left_frame, text="Настройки", font=("Arial", 12, "bold"))
-        settings_label.pack(pady=10)
+        # Процесс обработки
+        process_label = ttk.Label(left_frame, text="Процесс", font=("Arial", 12, "bold"))
+        process_label.pack(pady=10)
 
-        # API ключ Claude
-        ttk.Label(left_frame, text="Claude API Key:").pack(anchor=tk.W, pady=(5, 0))
-        self.api_key_entry = ttk.Entry(left_frame, width=25, show="*")
-        self.api_key_entry.pack(fill=tk.X, pady=5)
+        # Копировать отзыв
+        self.copy_review_btn = ttk.Button(left_frame, text="📋 Копировать отзыв", command=self.copy_current_review)
+        self.copy_review_btn.pack(fill=tk.X, pady=5)
+        self.copy_review_btn.config(state=tk.DISABLED)
 
-        # Промежуток времени между ответами
-        ttk.Label(left_frame, text="Задержка (сек):").pack(anchor=tk.W, pady=(5, 0))
-        self.delay_spinbox = ttk.Spinbox(left_frame, from_=1, to=30, width=25)
-        self.delay_spinbox.set(3)
-        self.delay_spinbox.pack(fill=tk.X, pady=5)
+        # Вставить в Claude
+        self.paste_in_claude_btn = ttk.Button(left_frame, text="💬 Вставить в Claude", command=self.paste_in_claude)
+        self.paste_in_claude_btn.pack(fill=tk.X, pady=5)
+        self.paste_in_claude_btn.config(state=tk.DISABLED)
 
-        # Сохранить настройки
-        self.save_config_btn = ttk.Button(left_frame, text="Сохранить", command=self.save_config)
-        self.save_config_btn.pack(fill=tk.X, pady=5)
+        # Копировать ответ из Claude
+        self.copy_answer_btn = ttk.Button(left_frame, text="📋 Копировать ответ", command=self.copy_answer)
+        self.copy_answer_btn.pack(fill=tk.X, pady=5)
+        self.copy_answer_btn.config(state=tk.DISABLED)
+
+        # Вставить в Ozon
+        self.paste_in_ozon_btn = ttk.Button(left_frame, text="✏️ Вставить в Ozon", command=self.paste_in_ozon)
+        self.paste_in_ozon_btn.pack(fill=tk.X, pady=5)
+        self.paste_in_ozon_btn.config(state=tk.DISABLED)
+
+        # Отправить
+        self.send_btn = ttk.Button(left_frame, text="✓ Отправить", command=self.send_answer)
+        self.send_btn.pack(fill=tk.X, pady=5)
+        self.send_btn.config(state=tk.DISABLED)
 
         # Правая панель - логирование и просмотр отзывов
         right_frame = ttk.Frame(self.root)
@@ -97,38 +107,54 @@ class OzonReviewsApp:
         self.progress_label = ttk.Label(status_frame, text="Отзывы: 0/0")
         self.progress_label.pack()
 
+        # Инструкция
+        instruction_frame = ttk.LabelFrame(right_frame, text="Инструкция", padding=10)
+        instruction_frame.pack(fill=tk.X, pady=5)
+
+        instruction_text = """1. Нажмите кнопки 1-3 для подготовки
+2. Кликните "Копировать отзыв"
+3. Кликните "Вставить в Claude"
+4. Получите ответ в Claude вручную
+5. Кликните "Копировать ответ"
+6. Кликните "Вставить в Ozon"
+7. Кликните "Отправить"
+8. Повторите для следующего отзыва"""
+
+        instruction_label = ttk.Label(instruction_frame, text=instruction_text, justify=tk.LEFT)
+        instruction_label.pack(anchor=tk.W)
+
         # Лог
         log_frame = ttk.LabelFrame(right_frame, text="Лог операций", padding=5)
         log_frame.pack(fill=tk.BOTH, expand=True, pady=5)
 
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=15, width=70, wrap=tk.WORD)
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=70, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True)
 
         # Текущий отзыв
         review_frame = ttk.LabelFrame(right_frame, text="Текущий отзыв", padding=5)
         review_frame.pack(fill=tk.X, pady=5)
 
-        self.current_review_text = scrolledtext.ScrolledText(review_frame, height=4, width=70, wrap=tk.WORD)
+        self.current_review_text = scrolledtext.ScrolledText(review_frame, height=3, width=70, wrap=tk.WORD)
         self.current_review_text.pack(fill=tk.X)
 
         # Ответ от Claude
-        answer_frame = ttk.LabelFrame(right_frame, text="Ответ от Claude", padding=5)
+        answer_frame = ttk.LabelFrame(right_frame, text="Ответ из Claude", padding=5)
         answer_frame.pack(fill=tk.X, pady=5)
 
-        self.current_answer_text = scrolledtext.ScrolledText(answer_frame, height=4, width=70, wrap=tk.WORD)
+        self.current_answer_text = scrolledtext.ScrolledText(answer_frame, height=3, width=70, wrap=tk.WORD)
         self.current_answer_text.pack(fill=tk.X)
 
-        # Кнопки управления текущим отзывом
-        button_frame = ttk.Frame(right_frame)
-        button_frame.pack(fill=tk.X, pady=5)
+        # Кнопки управления отзывами
+        nav_frame = ttk.Frame(right_frame)
+        nav_frame.pack(fill=tk.X, pady=5)
 
-        self.approve_btn = ttk.Button(button_frame, text="✓ Одобрить и отправить", command=self.approve_current)
-        self.approve_btn.pack(side=tk.LEFT, padx=5)
-        self.approve_btn.config(state=tk.DISABLED)
+        self.prev_btn = ttk.Button(nav_frame, text="← Предыдущий", command=self.prev_review)
+        self.prev_btn.pack(side=tk.LEFT, padx=5)
+        self.prev_btn.config(state=tk.DISABLED)
 
-        self.skip_btn = ttk.Button(button_frame, text="⊘ Пропустить", command=self.skip_current)
-        self.skip_btn.pack(side=tk.LEFT, padx=5)
-        self.skip_btn.config(state=tk.DISABLED)
+        self.next_btn = ttk.Button(nav_frame, text="Следующий →", command=self.next_review)
+        self.next_btn.pack(side=tk.LEFT, padx=5)
+        self.next_btn.config(state=tk.DISABLED)
 
     def log(self, message):
         """Добавляет сообщение в лог"""
@@ -155,7 +181,11 @@ class OzonReviewsApp:
             self.reviews = self.automation.get_reviews()
             self.log(f"✓ Загружено {len(self.reviews)} отзывов")
             self.progress_label.config(text=f"Отзывы: 0/{len(self.reviews)}")
-            self.start_btn.config(state=tk.NORMAL)
+            self.current_review_index = 0
+            self.show_current_review()
+            self.copy_review_btn.config(state=tk.NORMAL)
+            self.prev_btn.config(state=tk.NORMAL)
+            self.next_btn.config(state=tk.NORMAL)
         except Exception as e:
             self.log(f"✗ Ошибка: {str(e)}")
             messagebox.showerror("Ошибка", str(e))
@@ -165,152 +195,137 @@ class OzonReviewsApp:
         self.log("Открываю Claude...")
         try:
             self.automation.open_claude()
-            self.log("✓ Claude открыт")
+            self.log("✓ Claude открыт в новом окне")
+            self.paste_in_claude_btn.config(state=tk.NORMAL)
         except Exception as e:
             self.log(f"✗ Ошибка: {str(e)}")
 
-    def start_automation(self):
-        """Начинает автоматизацию"""
+    def show_current_review(self):
+        """Показывает текущий отзыв"""
+        if not self.reviews or self.current_review_index < 0:
+            return
+
+        if self.current_review_index >= len(self.reviews):
+            self.current_review_index = len(self.reviews) - 1
+
+        review = self.reviews[self.current_review_index]
+        self.current_review_text.delete(1.0, tk.END)
+        self.current_review_text.insert(1.0, review.get('text', ''))
+        self.progress_label.config(text=f"Отзывы: {self.current_review_index + 1}/{len(self.reviews)}")
+
+    def copy_current_review(self):
+        """Копирует текущий отзыв в буфер обмена"""
         if not self.reviews:
             messagebox.showwarning("Предупреждение", "Сначала загрузите отзывы")
             return
 
-        self.is_running = True
-        self.start_btn.config(state=tk.DISABLED)
-        self.stop_btn.config(state=tk.NORMAL)
-        self.load_reviews_btn.config(state=tk.DISABLED)
-
-        # Запускаем в отдельном потоке
-        thread = threading.Thread(target=self.automation_loop)
-        thread.daemon = True
-        thread.start()
-
-    def automation_loop(self):
-        """Основной цикл автоматизации"""
+        review_text = self.reviews[self.current_review_index].get('text', '')
         try:
-            for i, review in enumerate(self.reviews):
-                if not self.is_running:
-                    break
-
-                self.current_review_index = i
-                self.process_review(review, i)
-                self.progress_label.config(text=f"Отзывы: {i+1}/{len(self.reviews)}")
-
-            self.log("✓ Обработка завершена")
-            self.status_label.config(text="Завершено", foreground="green")
-            self.stop_automation()
+            self.automation.copy_to_clipboard(review_text)
+            self.log(f"✓ Отзыв #{self.current_review_index + 1} скопирован")
+            self.paste_in_claude_btn.config(state=tk.NORMAL)
         except Exception as e:
-            self.log(f"✗ Ошибка в цикле: {str(e)}")
-            self.stop_automation()
+            self.log(f"✗ Ошибка копирования: {str(e)}")
 
-    def process_review(self, review, index):
-        """Обрабатывает один отзыв"""
+    def paste_in_claude(self):
+        """Вставляет отзыв в Claude"""
+        self.log("Переключитесь на Claude и нажмите кнопку вставки")
+        self.log("Или просто нажмите Ctrl+V в Claude")
         try:
-            self.status_label.config(text="Обработка...", foreground="blue")
-            self.log(f"\n--- Отзыв #{index + 1} ---")
-            self.log(f"Текст: {review.get('text', 'N/A')[:100]}...")
-
-            # Показываем текущий отзыв
-            self.current_review_text.delete(1.0, tk.END)
-            self.current_review_text.insert(1.0, review.get('text', ''))
-
-            # Копируем отзыв в буфер обмена
-            self.automation.copy_to_clipboard(review.get('text', ''))
-            self.log("Отзыв скопирован в буфер обмена")
-
-            # Переключаемся на Claude и вставляем
-            self.log("Переключаюсь на Claude...")
             self.automation.switch_to_claude()
-            time.sleep(2)
-
-            # Вставляем отзыв (Ctrl+V)
-            self.automation.paste()
-            self.log("Отзыв вставлен в Claude")
-
-            # Ждем ответа
-            self.log("Ожидаю ответ от Claude... (нажмите Enter в Claude)")
-            self.log("⏳ Можно вручную нажать Enter и дождаться ответа")
-
-            # Даем время на генерацию ответа
-            delay = int(self.delay_spinbox.get())
-            for remaining in range(delay, 0, -1):
-                if not self.is_running:
-                    return
-                self.status_label.config(text=f"Ожидание... {remaining}с")
-                time.sleep(1)
-
-            # Копируем ответ (Ctrl+A, Ctrl+C)
-            self.automation.select_all()
             time.sleep(0.5)
-            self.automation.copy()
-            answer = self.automation.read_clipboard()
+            self.automation.paste()
+            self.log("✓ Отзыв вставлен в Claude")
+            self.copy_answer_btn.config(state=tk.NORMAL)
+        except Exception as e:
+            self.log(f"✗ Ошибка: {str(e)}")
 
-            self.log(f"Ответ получен: {answer[:100]}...")
+    def copy_answer(self):
+        """Копирует ответ из Claude"""
+        self.log("Выделите ответ в Claude (Ctrl+A) и скопируйте (Ctrl+C)")
+        try:
+            # Даем время пользователю выделить текст
+            time.sleep(1)
+            answer = self.automation.read_clipboard()
             self.current_answer_text.delete(1.0, tk.END)
             self.current_answer_text.insert(1.0, answer)
-
-            # Переключаемся обратно на Ozon
-            self.log("Переключаюсь на Ozon...")
-            self.automation.switch_to_ozon()
-            time.sleep(2)
-
-            # Вставляем ответ в форму
-            self.automation.paste()
-            self.log("Ответ вставлен в форму Ozon")
-
-            # Отправляем
-            self.log("Отправляю ответ...")
-            self.automation.send_answer()
-            self.log("✓ Ответ отправлен успешно")
-            self.status_label.config(text="Готово", foreground="green")
-
+            self.log("✓ Ответ скопирован")
+            self.paste_in_ozon_btn.config(state=tk.NORMAL)
         except Exception as e:
-            self.log(f"✗ Ошибка обработки: {str(e)}")
-            self.status_label.config(text="Ошибка", foreground="red")
+            self.log(f"✗ Ошибка: {str(e)}")
 
-    def approve_current(self):
-        """Одобрить текущий ответ"""
-        self.log("✓ Ответ одобрен")
-        self.approve_btn.config(state=tk.DISABLED)
-        self.skip_btn.config(state=tk.DISABLED)
+    def paste_in_ozon(self):
+        """Вставляет ответ в Ozon"""
+        try:
+            self.automation.switch_to_ozon()
+            time.sleep(0.5)
+            self.automation.paste()
+            self.log("✓ Ответ вставлен в Ozon")
+            self.send_btn.config(state=tk.NORMAL)
+        except Exception as e:
+            self.log(f"✗ Ошибка: {str(e)}")
 
-    def skip_current(self):
-        """Пропустить текущий отзыв"""
-        self.log("⊘ Отзыв пропущен")
-        self.approve_btn.config(state=tk.DISABLED)
-        self.skip_btn.config(state=tk.DISABLED)
+    def send_answer(self):
+        """Отправляет ответ"""
+        try:
+            self.automation.send_answer()
+            self.log("✓ Ответ отправлен")
+            self.current_answer_text.delete(1.0, tk.END)
+            self.status_label.config(text="Ответ отправлен ✓", foreground="green")
+
+            # Переходим к следующему отзыву
+            self.next_review()
+        except Exception as e:
+            self.log(f"Отправка завершена (нажмите кнопку отправки на сайте вручную)")
+
+    def start_automation(self):
+        """Начинает обработку - показывает первый отзыв"""
+        if not self.reviews:
+            messagebox.showwarning("Предупреждение", "Сначала загрузите отзывы")
+            return
+        self.current_review_index = 0
+        self.show_current_review()
+        self.log("✓ Готово к обработке отзывов")
+
+    def next_review(self):
+        """Переходит к следующему отзыву"""
+        if not self.reviews:
+            return
+        self.current_review_index += 1
+        if self.current_review_index >= len(self.reviews):
+            self.current_review_index = len(self.reviews) - 1
+            self.log("✓ Все отзывы обработаны!")
+            messagebox.showinfo("Готово", "Все отзывы обработаны!")
+            return
+        self.show_current_review()
+        self.copy_review_btn.config(state=tk.NORMAL)
+        self.paste_in_claude_btn.config(state=tk.DISABLED)
+        self.copy_answer_btn.config(state=tk.DISABLED)
+        self.paste_in_ozon_btn.config(state=tk.DISABLED)
+        self.send_btn.config(state=tk.DISABLED)
+        self.log(f"→ Следующий отзыв #{self.current_review_index + 1}")
+
+    def prev_review(self):
+        """Переходит к предыдущему отзыву"""
+        if not self.reviews:
+            return
+        self.current_review_index -= 1
+        if self.current_review_index < 0:
+            self.current_review_index = 0
+        self.show_current_review()
+        self.log(f"← Предыдущий отзыв #{self.current_review_index + 1}")
 
     def stop_automation(self):
-        """Останавливает автоматизацию"""
-        self.is_running = False
-        self.start_btn.config(state=tk.NORMAL)
-        self.stop_btn.config(state=tk.DISABLED)
-        self.load_reviews_btn.config(state=tk.NORMAL)
-        self.log("Обработка остановлена")
-
-    def save_config(self):
-        """Сохраняет конфигурацию"""
-        api_key = self.api_key_entry.get()
-        delay = self.delay_spinbox.get()
-
-        if not api_key:
-            messagebox.showwarning("Предупреждение", "Введите API ключ Claude")
-            return
-
-        self.config.set_api_key(api_key)
-        self.config.set_delay(int(delay))
-        self.automation.set_api_key(api_key)
-        self.log("✓ Настройки сохранены")
-        messagebox.showinfo("Успех", "Настройки сохранены")
+        """Очищает интерфейс"""
+        self.copy_review_btn.config(state=tk.DISABLED)
+        self.paste_in_claude_btn.config(state=tk.DISABLED)
+        self.copy_answer_btn.config(state=tk.DISABLED)
+        self.paste_in_ozon_btn.config(state=tk.DISABLED)
+        self.send_btn.config(state=tk.DISABLED)
 
     def load_config(self):
         """Загружает конфигурацию"""
-        api_key = self.config.get_api_key()
-        delay = self.config.get_delay()
-
-        if api_key:
-            self.api_key_entry.insert(0, api_key)
-        self.delay_spinbox.set(delay)
+        pass
 
 
 def main():
