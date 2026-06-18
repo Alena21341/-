@@ -31,57 +31,87 @@ class OzonAutomation:
 
     def open_ozon(self):
         """Открывает Ozon в браузере"""
-        if self.driver is None:
-            options = webdriver.ChromeOptions()
-            options.add_argument("--disable-blink-features=AutomationControlled")
-            options.add_argument("user-agent=Mozilla/5.0")
+        try:
+            if self.driver is None:
+                print("[DEBUG] Загружаю ChromeDriver...")
+                options = webdriver.ChromeOptions()
+                options.add_argument("--disable-blink-features=AutomationControlled")
+                options.add_argument("user-agent=Mozilla/5.0")
+                options.add_argument("--disable-gpu")
+                print("[DEBUG] Создаю Chrome драйвер...")
 
-            self.driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
-                options=options
-            )
+                self.driver = webdriver.Chrome(
+                    service=Service(ChromeDriverManager().install()),
+                    options=options
+                )
 
-        self.ozon_driver = self.driver
-        self.driver.get("https://seller.ozon.ru/app/reviews")
-        time.sleep(3)
-        self.wait_for_page_load()
+            self.ozon_driver = self.driver
+            print("[DEBUG] Открываю Ozon страницу...")
+            self.driver.get("https://seller.ozon.ru/app/reviews")
+            time.sleep(3)
+            self.wait_for_page_load()
+            print("[DEBUG] Ozon успешно открыт")
+        except Exception as e:
+            print(f"[ERROR] Ошибка при открытии Ozon: {e}")
+            raise
 
     def open_claude(self):
         """Открывает Claude в браузере"""
-        if self.claude_driver is None:
-            options = webdriver.ChromeOptions()
-            options.add_argument("--disable-blink-features=AutomationControlled")
+        try:
+            if self.claude_driver is None:
+                print("[DEBUG] Создаю новый драйвер для Claude...")
+                options = webdriver.ChromeOptions()
+                options.add_argument("--disable-blink-features=AutomationControlled")
+                options.add_argument("--disable-gpu")
 
-            self.claude_driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
-                options=options
-            )
+                self.claude_driver = webdriver.Chrome(
+                    service=Service(ChromeDriverManager().install()),
+                    options=options
+                )
 
-        self.claude_driver.get("https://claude.ai")
-        time.sleep(2)
+            print("[DEBUG] Открываю Claude...")
+            self.claude_driver.get("https://claude.ai")
+            time.sleep(2)
+            print("[DEBUG] Claude открыт успешно")
+        except Exception as e:
+            print(f"[ERROR] Ошибка при открытии Claude: {e}")
+            raise
 
     def get_reviews(self):
         """Получает список отзывов со страницы"""
         try:
+            print("[DEBUG] Ожидаю загрузки отзывов со страницы...")
             # Ждем загрузки таблицы
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_all_elements_located((By.CLASS_NAME, "n1d-d2a"))
-            )
+            try:
+                WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_all_elements_located((By.CLASS_NAME, "n1d-d2a"))
+                )
+            except Exception as wait_error:
+                print(f"[WARNING] Селектор n1d-d2a не найден: {wait_error}")
+                print("[DEBUG] Пробую альтернативные селекторы...")
 
             # Находим все элементы отзывов
             review_elements = self.driver.find_elements(By.CLASS_NAME, "n1d-d2a")
+            print(f"[DEBUG] Найдено элементов: {len(review_elements)}")
 
             reviews = []
-            for element in review_elements:
-                text = element.text.strip()
-                if text:
-                    reviews.append({
-                        "text": text,
-                        "element": element
-                    })
+            for i, element in enumerate(review_elements):
+                try:
+                    text = element.text.strip()
+                    if text:
+                        reviews.append({
+                            "text": text,
+                            "element": element
+                        })
+                        print(f"[DEBUG] Отзыв {i+1}: {text[:50]}...")
+                except Exception as e:
+                    print(f"[WARNING] Ошибка при чтении отзыва {i}: {e}")
+                    continue
 
+            print(f"[DEBUG] Всего загружено отзывов: {len(reviews)}")
             return reviews
         except Exception as e:
+            print(f"[ERROR] Ошибка загрузки отзывов: {e}")
             raise Exception(f"Ошибка загрузки отзывов: {str(e)}")
 
     def wait_for_page_load(self):
@@ -96,15 +126,22 @@ class OzonAutomation:
     def copy_to_clipboard(self, text):
         """Копирует текст в буфер обмена"""
         try:
+            print(f"[DEBUG] Копирую в буфер обмена ({len(text)} символов)...")
             pyperclip.copy(text)
+            print("[DEBUG] Текст успешно скопирован")
         except Exception as e:
+            print(f"[ERROR] Ошибка копирования: {e}")
             raise Exception(f"Ошибка копирования: {str(e)}")
 
     def read_clipboard(self):
         """Читает текст из буфера обмена"""
         try:
-            return pyperclip.paste()
+            print("[DEBUG] Читаю из буфера обмена...")
+            text = pyperclip.paste()
+            print(f"[DEBUG] Прочитано {len(text)} символов из буфера")
+            return text
         except Exception as e:
+            print(f"[ERROR] Ошибка чтения буфера: {e}")
             raise Exception(f"Ошибка чтения буфера: {str(e)}")
 
     def switch_to_claude(self):

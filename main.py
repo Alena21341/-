@@ -9,8 +9,16 @@ from tkinter import ttk, messagebox, scrolledtext
 import threading
 import time
 from datetime import datetime
-from automation import OzonAutomation
-from config import Config
+import traceback
+import sys
+
+try:
+    from automation import OzonAutomation
+    from config import Config
+except ImportError as e:
+    print(f"ОШИБКА ИМПОРТА: {e}")
+    print("Убедитесь, что установлены все зависимости: pip install -r requirements.txt")
+    sys.exit(1)
 
 class OzonReviewsApp:
     def __init__(self, root):
@@ -167,17 +175,21 @@ class OzonReviewsApp:
         """Открывает браузер с Ozon"""
         self.log("Открываю Ozon...")
         try:
+            print("[DEBUG] Начинаю открывать Ozon...")
             self.automation.open_ozon()
             self.log("✓ Ozon открыт")
             self.load_reviews_btn.config(state=tk.NORMAL)
         except Exception as e:
-            self.log(f"✗ Ошибка: {str(e)}")
-            messagebox.showerror("Ошибка", str(e))
+            error_msg = f"✗ Ошибка открытия Ozon: {str(e)}\n{traceback.format_exc()}"
+            print(f"[ERROR] {error_msg}")
+            self.log(error_msg)
+            messagebox.showerror("Ошибка", f"Не удалось открыть Ozon:\n{str(e)}")
 
     def load_reviews(self):
         """Загружает отзывы со страницы"""
         self.log("Загружаю отзывы...")
         try:
+            print("[DEBUG] Загружаю отзывы со страницы...")
             self.reviews = self.automation.get_reviews()
             self.log(f"✓ Загружено {len(self.reviews)} отзывов")
             self.progress_label.config(text=f"Отзывы: 0/{len(self.reviews)}")
@@ -187,8 +199,10 @@ class OzonReviewsApp:
             self.prev_btn.config(state=tk.NORMAL)
             self.next_btn.config(state=tk.NORMAL)
         except Exception as e:
-            self.log(f"✗ Ошибка: {str(e)}")
-            messagebox.showerror("Ошибка", str(e))
+            error_msg = f"✗ Ошибка загрузки отзывов: {str(e)}\n{traceback.format_exc()}"
+            print(f"[ERROR] {error_msg}")
+            self.log(error_msg)
+            messagebox.showerror("Ошибка", f"Не удалось загрузить отзывы:\n{str(e)}")
 
     def open_claude(self):
         """Открывает Claude"""
