@@ -6,21 +6,33 @@ OZON AUTO ANSWERER
 копирует ответ и вставляет в Ozon
 """
 
-import pyperclip
-import pyautogui
-import time
-import webbrowser
-import subprocess
 import sys
+import subprocess
+import time
 import os
 
-# Установка зависимостей
-try:
-    import pyperclip
-except ImportError:
-    print("Установка pyperclip...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "pyperclip"])
-    import pyperclip
+# УСТАНОВКА ВСЕХ НУЖНЫХ МОДУЛЕЙ
+def install_modules():
+    """Установка всех необходимых модулей"""
+    modules = ["pyperclip", "pyautogui"]
+
+    for module in modules:
+        try:
+            __import__(module)
+            print(f"[✓] {module} - OK")
+        except ImportError:
+            print(f"[*] Устанавливаю {module}...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", module])
+            print(f"[✓] {module} установлен")
+
+print("[*] Проверка зависимостей...\n")
+install_modules()
+print("\n[✓] Все модули установлены!\n")
+
+# ИМПОРТ МОДУЛЕЙ
+import pyperclip
+import pyautogui
+import webbrowser
 
 
 def clear():
